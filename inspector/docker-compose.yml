@@ -1,12 +1,19 @@
-# Inflowenger developer panel — the reference inflow-inspector-api (Go/Fiber)
+# Inflowenger inspector panel — the reference inflow-inspector-api (Go/Fiber)
 # plus the inflow-inspector Vue frontend.
+#
+# These images are self-building: they ship only tooling, and at container START
+# their entrypoint clones the source (at the ref below), compiles it NATIVE to
+# your CPU (amd64 or arm64), and runs it. So the first `up` takes a few minutes
+# and needs network (GitHub, Go modules, npm) — after that the ./src volumes
+# cache the checkout so restarts are quick. Nothing is compiled at image-build
+# time, and one published image works on every architecture.
 #
 # Requires the platform stack (../platform) to be up FIRST: this stack joins the
 # same external `inflow_net` network to reach Infra by service name.
 #
 #   cp .env.example .env      # then set INFLOW_INFRA_JWT_SECRET to match the
 #                             # platform's API_JWT_SECRET
-#   docker compose up -d
+#   docker compose up -d      # first start clones + builds inside the container
 #   open http://localhost:8080
 #
 name: inflow-inspector
@@ -17,6 +24,8 @@ services:
     container_name: inflow-inspector-api
     restart: unless-stopped
     environment:
+      # Branch or tag the entrypoint checks out and builds at runtime.
+      INSPECTOR_API_REF: ${INSPECTOR_API_REF:-master}
       PORT: "8025"
       DB_STORE_PATH: /data
       # Base URL of Infra's REST API. inflow-inspector-api reverse-proxies
@@ -29,7 +38,8 @@ services:
       # it, and you paste the SAME key into the panel's Auth dialog to sign in.
       INFLOW_INFRA_JWT_SECRET: ${INFLOW_INFRA_JWT_SECRET:?set INFLOW_INFRA_JWT_SECRET in .env — Infra's API Secret Key from its logs}
     volumes:
-      - ./backend-data:/data   # BadgerDB store
+      - ./backend-data:/data          # BadgerDB store
+      - inspector-api-src:/src        # cached checkout + build (speeds restarts)
     ports:
       - "8025:8025"
     networks:
@@ -41,12 +51,21 @@ services:
     restart: unless-stopped
     depends_on:
       - inflow-inspector-api
-    # The panel is static assets with no backend URL baked in. You enter the
-    # Base Server URL (the inflow-inspector-api, e.g. http://localhost:8025) in
-    # the Auth dialog at runtime — Swagger-style — so nothing to configure here.
+    environment:
+      # Branch or tag the entrypoint checks out and builds at runtime.
+      INSPECTOR_REF: ${INSPECTOR_REF:-master}
+    volumes:
+      - inspector-src:/src            # cached checkout + node_modules + dist
+    # Static assets, no backend URL baked in — enter the Base Server URL (the
+    # inflow-inspector-api, e.g. http://localhost:8025) in the Auth dialog at
+    # runtime, Swagger-style. Nothing to configure here.
     ports:
       - "8080:80"
 
 networks:
   inflow_net:
     external: true   # created by the platform stack
+
+volumes:
+  inspector-api-src:
+  inspector-src:

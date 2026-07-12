@@ -18,7 +18,7 @@ services:
     environment:
       # All optional. If OPERATOR_SEED / API_JWT_SECRET are left blank, Infra
       # generates them on first boot and writes them to /data. Set
-      # API_JWT_SECRET explicitly so the dev panel can share the same secret.
+      # API_JWT_SECRET explicitly so the inspector panel can share the same secret.
       OPERATOR_SEED: ${OPERATOR_SEED:-}
       API_JWT_SECRET: ${API_JWT_SECRET:-}
       INFRA_CLUSTER: ${INFRA_CLUSTER:-}
@@ -49,6 +49,6 @@ services:
 
 networks:
   inflow_net:
-    # Fixed name (no compose project prefix) so the dev-panel stack and the
+    # Fixed name (no compose project prefix) so the inspector stack and the
     # `curl | bash` Fractal installer can attach to the exact same network.
     name: inflow_net

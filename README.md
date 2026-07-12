@@ -5,14 +5,14 @@ From zero to a running Inflowenger ecosystem **plus** the developer panel, in tw
 
 If you just want to read the conceptual install story, see the website's
 [Installation page](../inflow-vue/inflow-nuxt/app/pages/installation.vue). This
-folder is the hands-on, copy-paste version that also stands up the dev panel.
+folder is the hands-on, copy-paste version that also stands up the inspector panel.
 
 ---
 
 ## Quick install (one-liner)
 
 The fastest path. This asks a few questions, brings up Infra + Fractal, and —
-if you agree — the inspector dev panel, then prints your API Secret Key and the
+if you agree — the inspector panel, then prints your API Secret Key and the
 panel URL:
 
 ```bash
@@ -40,9 +40,11 @@ curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/in
 | `INFRA_CLUSTER` | *(empty)* | Cluster name for a paid/sponsored license. |
 | `FRACTAL_TAGS` | `default` | Comma-separated Fractal tags. |
 | `FRACTAL_NAME` | `fractal-1` | Fractal container name. |
-| `INSTALL_INSPECTOR` | *prompted* | `1`/`0` — install the dev panel. |
+| `INSTALL_INSPECTOR` | *prompted* | `1`/`0` — install the inspector panel. |
 | `IMAGE_NS` | `mehdishokohi` | Docker Hub namespace for all images. |
 | `IMAGE_TAG` | `latest` | Image tag for all images. |
+| `INSPECTOR_API_REF` | `master` | Branch/tag the backend image builds at runtime. |
+| `INSPECTOR_REF` | `master` | Branch/tag the frontend image builds at runtime. |
 | `ASSUME_YES` | `0` | `1` — accept all defaults, no prompts. |
 
 </details>
@@ -96,10 +98,15 @@ panel is optional tooling on top. They meet on a shared Docker network,
 
 - **Docker** with the **Compose v2** plugin (`docker compose version`).
 - Free host ports: `8022`, `8222`, `4222` (platform) and `8025`, `8080`
-  (dev panel).
-- Network access to pull the published images: `mehdishokohi/inflow-infra`,
-  `mehdishokohi/fractal`, `mehdishokohi/inflow-inspector-api`, and
-  `mehdishokohi/inflow-inspector`.
+  (inspector panel).
+- **Network access.** All four images are pulled from Docker Hub as multi-arch
+  (amd64 + arm64) manifests. The two platform images (`mehdishokohi/inflow-infra`,
+  `mehdishokohi/fractal`) run immediately. The two inspector images
+  (`mehdishokohi/inflow-inspector-api`, `mehdishokohi/inflow-inspector`) are
+  **self-building**: their entrypoint clones the source and compiles it *inside
+  the container at first start*, native to your CPU — so that first start also
+  reaches GitHub, the Go module proxy, and the npm registry and takes a few
+  minutes. A named volume then caches the checkout so later restarts are quick.
 
 ---
 
@@ -112,8 +119,8 @@ cd platform
 cp .env.example .env
 ```
 
-Infra needs an **API Secret Key** — the shared HMAC secret the dev panel uses to
-authenticate later. You have two choices:
+Infra needs an **API Secret Key** — the shared HMAC secret the inspector panel
+uses to authenticate later. You have two choices:
 
 - **Let Infra generate it** (leave `API_JWT_SECRET` blank) and copy the value it
   prints on first boot — see [Confirm a healthy start](#confirm-a-healthy-start).
@@ -163,12 +170,12 @@ trial.
 
 ---
 
-## Part 2 — Developer panel (backend + frontend)
+## Part 2 — Inspector panel (backend + frontend)
 
 The panel joins the **same** `inflow_net`, so the platform must be running first.
 
 ```bash
-cd ../dev-panel
+cd ../inspector
 cp .env.example .env
 ```
 
@@ -177,18 +184,29 @@ Edit `.env` and set **`INFLOW_INFRA_JWT_SECRET`** to Infra's **API Secret Key**
 
 ```bash
 docker compose up -d
+docker compose logs -f          # watch the first-start clone + compile
 ```
 
-This pulls two published images:
+Both images pull instantly, but they're **self-building**: rather than shipping
+a prebuilt binary, each image's entrypoint clones its source and **compiles it
+inside the container at start**, native to your CPU (amd64 or arm64). So the
+first `up` takes a few minutes while it clones + builds; a named volume caches
+the checkout afterward. The two components:
 
-- **`mehdishokohi/inflow-inspector-api`** — the panel backend
-  ([source](https://github.com/Inflowenger/inflow-inspector-api)). Reaches Infra
-  at `http://inflow-infra:8022` over the shared network, and reverse-proxies
-  `/infra/*` to it for the panel's infra views.
-- **`mehdishokohi/inflow-inspector`** — the Vue panel
-  ([source](https://github.com/Inflowenger/inflow-inspector)), served by nginx.
+- **inflow-inspector-api** (`mehdishokohi/inflow-inspector-api`) — the panel
+  backend, source at
+  [github.com/Inflowenger/inflow-inspector-api](https://github.com/Inflowenger/inflow-inspector-api).
+  Reaches Infra at `http://inflow-infra:8022` over the shared network, and
+  reverse-proxies `/infra/*` to it for the panel's infra views.
+- **inflow-inspector** (`mehdishokohi/inflow-inspector`) — the Vue panel, source
+  at [github.com/Inflowenger/inflow-inspector](https://github.com/Inflowenger/inflow-inspector).
   Static assets with **no** backend URL baked in — you point it at the backend
   from the Auth dialog at runtime (see below).
+
+> **Which ref it builds.** By default each image checks out and compiles the
+> `master` branch. Pin a release tag for reproducible restarts by setting
+> `INSPECTOR_API_REF` / `INSPECTOR_REF` in `.env`. To re-pull the latest source
+> and recompile, `docker compose restart` (the entrypoint re-fetches + rebuilds).
 
 ### Sign in to the panel
 
@@ -244,7 +262,7 @@ Re-open the dialog and hit **Log Out** to clear them.
 | `8222` | Infra            | NATS HTTP monitor                        |
 | `4222` | Infra            | NATS client (only if connecting locally) |
 | `8025` | inflow-inspector-api | REST + WebSocket log feed             |
-| `8080` | inflow-inspector | The dev panel UI                         |
+| `8080` | inflow-inspector | The inspector panel UI                   |
 
 ## Environment variables
 
@@ -253,15 +271,17 @@ Re-open the dialog and hit **Log Out** to clear them.
 | Var              | Purpose                                                            |
 |------------------|--------------------------------------------------------------------|
 | `OPERATOR_SEED`  | NATS operator key signing all JWTs. Blank → generated & persisted. |
-| `API_JWT_SECRET` | Infra API secret. **Share this with the dev panel.**               |
+| `API_JWT_SECRET` | Infra API secret. **Share this with the inspector panel.**         |
 | `INFRA_CLUSTER`  | Cluster name for a paid/sponsored license. Blank for free use.     |
 | `FRACTAL_TAGS`   | Comma-separated tags for the Fractal runtime.                      |
 
-**Dev panel** (`dev-panel/.env`):
+**Inspector panel** (`inspector/.env`):
 
 | Var                       | Purpose                                                     |
 |---------------------------|-------------------------------------------------------------|
 | `INFLOW_INFRA_JWT_SECRET` | Infra's API Secret Key (from its logs / `API_JWT_SECRET`).   |
+| `INSPECTOR_API_REF`       | Branch/tag the backend image clones + builds at start (default `master`). |
+| `INSPECTOR_REF`           | Branch/tag the frontend image clones + builds at start (default `master`). |
 
 ---
 
@@ -296,8 +316,8 @@ logs — the portal id is instance-specific.
 ## Teardown
 
 ```bash
-# dev panel
-cd dev-panel && docker compose down
+# inspector panel (add -v to also drop the cached source-build volumes)
+cd inspector && docker compose down
 
 # platform (add -v to also delete Infra's persisted keys in ./store)
 cd ../platform && docker compose down
@@ -332,16 +352,46 @@ getting-started/
 ├── platform/
 │   ├── docker-compose.yml        infra + fractal
 │   └── .env.example
-└── dev-panel/
+└── inspector/
     ├── docker-compose.yml        inflow-inspector-api + inflow-inspector
     └── .env.example
 ```
 
 This folder is just the orchestration and the tutorial that ties everything
-together — it pulls prebuilt images and stands them up. The panel's two
-components each live in (and are published from) their own repos:
+together — it pulls images and stands them up. The panel's two components each
+live in (and are published from) their own repos:
 
 - **inflow-inspector-api** — https://github.com/Inflowenger/inflow-inspector-api
   (published as `mehdishokohi/inflow-inspector-api`).
 - **inflow-inspector** — https://github.com/Inflowenger/inflow-inspector
   (published as `mehdishokohi/inflow-inspector`).
+
+## For maintainers — publishing the images
+
+All four images are pulled from Docker Hub, so all four must be published there
+as **multi-arch manifests** (so `docker compose pull` resolves amd64 or arm64
+automatically). They split into two kinds:
+
+| Image | Kind | What the image contains |
+|-------|------|-------------------------|
+| `mehdishokohi/inflow-infra` | prebuilt binary | The compiled Infra service (embedded NATS + coordinator). |
+| `mehdishokohi/fractal` | prebuilt binary | The compiled Fractal runtime. |
+| `mehdishokohi/inflow-inspector-api` | **self-building** | Go toolchain + git + an entrypoint that clones & compiles the source at container start. No app binary baked in. |
+| `mehdishokohi/inflow-inspector` | **self-building** | node + pnpm + git + a static server + an entrypoint that clones & builds the SPA at container start. No assets baked in. |
+
+The two self-building images are cheap to publish multi-arch — they contain no
+compiled artifacts, so buildx just layers the base image + entrypoint per arch;
+the actual compile happens on the user's machine at run time:
+
+```bash
+# platform binaries (built however you build them, then pushed multi-arch)
+docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/inflow-infra:latest --push .
+docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/fractal:latest       --push .
+
+# self-building panel images — context is irrelevant, so build straight from the Dockerfile
+docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/inflow-inspector-api:latest --push - < path/to/inflow-inspector-api/Dockerfile
+docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/inflow-inspector:latest     --push - < path/to/inflow-inspector/Dockerfile
+```
+
+Because the panel images fetch source over HTTPS at run time, both repos must be
+**publicly cloneable** (or users must supply Git credentials to the containers).
