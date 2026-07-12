@@ -131,9 +131,12 @@ uses to authenticate later. You have two choices:
   openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 60; echo
   ```
 
-Either way, you'll reuse this key in Part 2. Then bring it up:
+Either way, you'll reuse this key in Part 2. Both stacks share an external
+Docker network, `inflow_net` — create it once per host, then bring the platform
+up:
 
 ```bash
+docker network create inflow_net   # once per host; skip if it already exists
 docker compose up -d
 docker compose logs -f infra
 ```
@@ -325,8 +328,9 @@ cd ../platform && docker compose down
 
 ## Troubleshooting
 
-- **`network inflow_net declared as external, but could not be found`** — start
-  the platform stack first (it creates `inflow_net`).
+- **`network inflow_net declared as external, but could not be found`** — the
+  shared network doesn't exist yet. Create it once with
+  `docker network create inflow_net` (the one-liner installer does this for you).
 - **Panel says unauthorized / 401** — the **Shared Secret** you entered in the
   Auth dialog, the backend's `INFLOW_INFRA_JWT_SECRET`, and Infra's API Secret
   Key must all be the same value. If you changed the secret, restart

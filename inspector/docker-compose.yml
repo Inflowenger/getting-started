@@ -64,7 +64,7 @@ services:
 
 networks:
   inflow_net:
-    external: true   # created by the platform stack
+    external: true   # docker network create inflow_net (installer does this)
 
 volumes:
   inspector-api-src:

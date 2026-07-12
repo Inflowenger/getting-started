@@ -5,7 +5,8 @@
 # that executes workflow graphs; it registers itself against Infra's built-in
 # default onboarding portal (path "abc") over the shared `inflow_net` network.
 #
-#   cp .env.example .env      # then set API_JWT_SECRET
+#   cp .env.example .env             # then set API_JWT_SECRET
+#   docker network create inflow_net # shared external net (once per host)
 #   docker compose up -d
 #
 name: inflow-platform
@@ -48,7 +49,9 @@ services:
       - inflow_net
 
 networks:
+  # Shared, externally-managed network (fixed name, no compose project prefix) so
+  # the inspector stack and the `curl | bash` Fractal installer attach to the
+  # exact same network. Create it once before `up`:
+  #   docker network create inflow_net
   inflow_net:
-    # Fixed name (no compose project prefix) so the inspector stack and the
-    # `curl | bash` Fractal installer can attach to the exact same network.
-    name: inflow_net
+    external: true

@@ -188,8 +188,10 @@ services:
       - inflow_net
 
 networks:
+  # Created by install.sh (docker network create inflow_net) so the inspector
+  # stack and the `curl | bash` Fractal installer attach to the exact same net.
   inflow_net:
-    name: inflow_net
+    external: true
 YAML
 
 # .env carries the concrete values (real secret) into the compose stack above.
@@ -204,6 +206,18 @@ YAML
 } > "$INFLOW_DIR/platform/.env"
 chmod 600 "$INFLOW_DIR/platform/.env"
 ok "platform/docker-compose.yml + .env written"
+
+# Ensure the shared external network exists. The platform stack would create it
+# on its own, but the inspector stack (and the `curl | bash` Fractal installer)
+# declare `inflow_net` as external and fail if it's missing — so make it
+# idempotently here, before anything comes up.
+step "Ensuring the shared network (inflow_net) exists"
+if docker network inspect inflow_net >/dev/null 2>&1; then
+  ok "network inflow_net already exists"
+else
+  docker network create inflow_net >/dev/null
+  ok "created network inflow_net"
+fi
 
 step "Starting the platform (Infra + Fractal)"
 ( cd "$INFLOW_DIR/platform" && $DC pull --quiet 2>/dev/null || true; $DC up -d )
