@@ -1,0 +1,54 @@
+# Inflowenger platform — Infra + a Fractal runtime.
+#
+# Infra runs an embedded NATS server and bootstraps every account/credential the
+# ecosystem needs on first boot (persisted to ./store). Fractal is the runtime
+# that executes workflow graphs; it registers itself against Infra's built-in
+# default onboarding portal (path "abc") over the shared `inflow_net` network.
+#
+#   cp .env.example .env      # then set API_JWT_SECRET
+#   docker compose up -d
+#
+name: inflow-platform
+
+services:
+  infra:
+    image: mehdishokohi/inflow-infra:latest
+    container_name: inflow-infra
+    restart: unless-stopped
+    environment:
+      # All optional. If OPERATOR_SEED / API_JWT_SECRET are left blank, Infra
+      # generates them on first boot and writes them to /data. Set
+      # API_JWT_SECRET explicitly so the dev panel can share the same secret.
+      OPERATOR_SEED: ${OPERATOR_SEED:-}
+      API_JWT_SECRET: ${API_JWT_SECRET:-}
+      INFRA_CLUSTER: ${INFRA_CLUSTER:-}
+    volumes:
+      # Persists the operator seed + API key. Without this, every restart mints
+      # new keys and invalidates existing Fractals, plugins, and panels.
+      - ./store:/data
+    ports:
+      - "8022:8022"   # HTTP API / onboarding portal
+      - "8222:8222"   # NATS HTTP monitor
+      - "4222:4222"   # NATS client (only needed to connect from the host)
+    networks:
+      - inflow_net
+
+  fractal:
+    image: mehdishokohi/fractal:latest
+    container_name: ${FRACTAL_NAME:-fractal-1}
+    restart: unless-stopped   # retries registration until Infra is reachable
+    depends_on:
+      - infra
+    environment:
+      TAGS: ${FRACTAL_TAGS:-default}
+      # Registers against Infra's built-in default portal ("abc"), reached by
+      # the compose service name over inflow_net.
+      REGISTER_URL: ${FRACTAL_REGISTER_URL:-http://inflow-infra:8022/register/abc}
+    networks:
+      - inflow_net
+
+networks:
+  inflow_net:
+    # Fixed name (no compose project prefix) so the dev-panel stack and the
+    # `curl | bash` Fractal installer can attach to the exact same network.
+    name: inflow_net
