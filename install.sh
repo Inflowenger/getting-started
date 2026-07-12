@@ -20,7 +20,6 @@
 #   FRACTAL_TAGS        comma-separated Fractal tags       (default: default)
 #   FRACTAL_NAME        Fractal container name             (default: fractal-1)
 #   INSTALL_INSPECTOR   1/0 — install the dev panel        (default: prompted, else 0)
-#   VITE_API_BASE_URL   browser-reachable inspector-api URL (default: http://localhost:8025)
 #   IMAGE_NS            Docker Hub namespace               (default: mehdishokohi)
 #   IMAGE_TAG           image tag for every image          (default: latest)
 #   ASSUME_YES          1 — accept all defaults, no prompts (default: 0)
@@ -35,7 +34,6 @@ INFRA_CLUSTER="${INFRA_CLUSTER:-}"
 FRACTAL_TAGS="${FRACTAL_TAGS:-default}"
 FRACTAL_NAME="${FRACTAL_NAME:-fractal-1}"
 INSTALL_INSPECTOR="${INSTALL_INSPECTOR:-}"
-VITE_API_BASE_URL="${VITE_API_BASE_URL:-http://localhost:8025}"
 IMAGE_NS="${IMAGE_NS:-mehdishokohi}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
 ASSUME_YES="${ASSUME_YES:-0}"
@@ -135,10 +133,6 @@ fi
 if [ -z "$INSTALL_INSPECTOR" ]; then
   if confirm "Also install the inspector developer panel?" y; then INSTALL_INSPECTOR=1; else INSTALL_INSPECTOR=0; fi
 fi
-if [ "$INSTALL_INSPECTOR" = "1" ]; then
-  VITE_API_BASE_URL="$(ask "Panel's default backend URL (browser-reachable)" "$VITE_API_BASE_URL")"
-fi
-
 INFRA_IMAGE="$IMAGE_NS/inflow-infra:$IMAGE_TAG"
 FRACTAL_IMAGE="$IMAGE_NS/fractal:$IMAGE_TAG"
 INSPECTOR_API_IMAGE="$IMAGE_NS/inflow-inspector-api:$IMAGE_TAG"
@@ -249,8 +243,8 @@ services:
     restart: unless-stopped
     depends_on:
       - inflow-inspector-api
-    # VITE_API_BASE_URL is baked into the published image at build time. Rebuild
-    # from source (github.com/Inflowenger/inflow-inspector) to change it.
+    # Static assets, no backend URL baked in — enter the Base Server URL in the
+    # panel's Auth dialog at runtime (Swagger-style).
     ports:
       - "8080:80"
 
@@ -263,7 +257,6 @@ YAML
     printf 'INSPECTOR_API_IMAGE=%s\n'     "$INSPECTOR_API_IMAGE"
     printf 'INSPECTOR_IMAGE=%s\n'         "$INSPECTOR_IMAGE"
     printf 'INFLOW_INFRA_JWT_SECRET=%s\n' "$API_JWT_SECRET"
-    printf 'VITE_API_BASE_URL=%s\n'       "$VITE_API_BASE_URL"
   } > "$INFLOW_DIR/dev-panel/.env"
   chmod 600 "$INFLOW_DIR/dev-panel/.env"
   ok "dev-panel/docker-compose.yml + .env written"
@@ -286,7 +279,7 @@ printf '    %s%s%s\n' "$YLW" "$API_JWT_SECRET" "$RST"
 if [ "$INSTALL_INSPECTOR" = "1" ]; then
   printf '\n%s  Developer panel%s\n' "$B" "$RST"
   info "Open                 http://localhost:8080"
-  info "In the Auth dialog:  Base Server URL = $VITE_API_BASE_URL"
+  info "In the Auth dialog:  Base Server URL = http://localhost:8025  (or wherever your browser reaches inflow-inspector-api)"
   info "                     Shared Secret   = the API Secret Key above"
 fi
 

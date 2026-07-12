@@ -41,7 +41,6 @@ curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/in
 | `FRACTAL_TAGS` | `default` | Comma-separated Fractal tags. |
 | `FRACTAL_NAME` | `fractal-1` | Fractal container name. |
 | `INSTALL_INSPECTOR` | *prompted* | `1`/`0` — install the dev panel. |
-| `VITE_API_BASE_URL` | `http://localhost:8025` | Browser-reachable inspector-api URL. |
 | `IMAGE_NS` | `mehdishokohi` | Docker Hub namespace for all images. |
 | `IMAGE_TAG` | `latest` | Image tag for all images. |
 | `ASSUME_YES` | `0` | `1` — accept all defaults, no prompts. |
@@ -188,13 +187,8 @@ This pulls two published images:
   `/infra/*` to it for the panel's infra views.
 - **`mehdishokohi/inflow-inspector`** — the Vue panel
   ([source](https://github.com/Inflowenger/inflow-inspector)), served by nginx.
-  `VITE_API_BASE_URL` is baked into the image at build time (default
-  `http://localhost:8025`).
-
-> **Custom backend URL?** The published `inflow-inspector` image is built with
-> `VITE_API_BASE_URL=http://localhost:8025`. If your backend is reachable at a
-> different host/port, rebuild the frontend from source with
-> `--build-arg VITE_API_BASE_URL=...` rather than using the published tag.
+  Static assets with **no** backend URL baked in — you point it at the backend
+  from the Auth dialog at runtime (see below).
 
 ### Sign in to the panel
 
@@ -268,7 +262,6 @@ Re-open the dialog and hit **Log Out** to clear them.
 | Var                       | Purpose                                                     |
 |---------------------------|-------------------------------------------------------------|
 | `INFLOW_INFRA_JWT_SECRET` | Infra's API Secret Key (from its logs / `API_JWT_SECRET`).   |
-| `VITE_API_BASE_URL`       | Default backend URL the Auth dialog pre-fills (host-reachable).|
 
 ---
 
@@ -321,11 +314,10 @@ cd ../platform && docker compose down
 - **Fractal keeps restarting** — it retries until Infra is reachable. Check
   `docker compose logs infra`; confirm Infra finished booting and the
   `REGISTER_URL` portal path (`abc` by default) is correct.
-- **Frontend points at the wrong API** — `VITE_API_BASE_URL` is baked into the
-  `inflow-inspector` image at build time (default `http://localhost:8025`). To
-  target a different backend URL, rebuild the image from source
-  (`github.com/Inflowenger/inflow-inspector`) with
-  `--build-arg VITE_API_BASE_URL=...`.
+- **Frontend points at the wrong API** — the backend URL isn't baked into the
+  image; it's whatever you entered as **Base Server URL** in the Auth dialog
+  (saved in `localStorage`). Re-open the dialog, hit **Log Out**, and sign in
+  again with the correct URL.
 - **Port already in use** — edit the `ports:` mapping in the relevant compose
   file (e.g. `"18080:80"`).
 

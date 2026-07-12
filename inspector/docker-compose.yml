@@ -41,11 +41,9 @@ services:
     restart: unless-stopped
     depends_on:
       - inflow-inspector-api
-    # NOTE: the published image bakes VITE_API_BASE_URL in at build time at its
-    # default of http://localhost:8025 (the browser reaches the backend on the
-    # host). If your inflow-inspector-api is served from a different host/port,
-    # rebuild the image from source (github.com/Inflowenger/inflow-inspector)
-    # with --build-arg VITE_API_BASE_URL=... instead of using this published tag.
+    # The panel is static assets with no backend URL baked in. You enter the
+    # Base Server URL (the inflow-inspector-api, e.g. http://localhost:8025) in
+    # the Auth dialog at runtime — Swagger-style — so nothing to configure here.
     ports:
       - "8080:80"
 
