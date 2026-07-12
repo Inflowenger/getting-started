@@ -9,6 +9,50 @@ folder is the hands-on, copy-paste version that also stands up the dev panel.
 
 ---
 
+## Quick install (one-liner)
+
+The fastest path. This asks a few questions, brings up Infra + Fractal, and —
+if you agree — the inspector dev panel, then prints your API Secret Key and the
+panel URL:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/install.sh | bash
+```
+
+It writes real `docker compose` stacks into `~/inflowenger/` (override with
+`INFLOW_DIR`), so afterward you manage them exactly like the manual steps below.
+The prompts read from your terminal even through the pipe; to run it unattended,
+drive it with env vars instead — e.g. accept every default and skip the panel:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/install.sh \
+  | ASSUME_YES=1 INSTALL_INSPECTOR=0 API_JWT_SECRET=my-shared-secret bash
+```
+
+<details>
+<summary>All installer environment variables</summary>
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `INFLOW_DIR` | `~/inflowenger` | Where the compose stacks are written. |
+| `API_JWT_SECRET` | *generated* | Infra API Secret Key / shared JWT secret. |
+| `OPERATOR_SEED` | *Infra generates* | NATS operator seed. |
+| `INFRA_CLUSTER` | *(empty)* | Cluster name for a paid/sponsored license. |
+| `FRACTAL_TAGS` | `default` | Comma-separated Fractal tags. |
+| `FRACTAL_NAME` | `fractal-1` | Fractal container name. |
+| `INSTALL_INSPECTOR` | *prompted* | `1`/`0` — install the dev panel. |
+| `VITE_API_BASE_URL` | `http://localhost:8025` | Browser-reachable inspector-api URL. |
+| `IMAGE_NS` | `mehdishokohi` | Docker Hub namespace for all images. |
+| `IMAGE_TAG` | `latest` | Image tag for all images. |
+| `ASSUME_YES` | `0` | `1` — accept all defaults, no prompts. |
+
+</details>
+
+> Prefer to see every step? The manual walkthrough below does exactly what the
+> script automates, one stack at a time.
+
+---
+
 ## What you're standing up
 
 An Inflowenger ecosystem is built from two headless services, and then a UI on
@@ -292,6 +336,7 @@ cd ../platform && docker compose down
 ```
 getting-started/
 ├── README.md                     ← you are here
+├── install.sh                    one-liner installer (curl | bash)
 ├── platform/
 │   ├── docker-compose.yml        infra + fractal
 │   └── .env.example
