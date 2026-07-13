@@ -33,13 +33,25 @@ services:
       - "4222:4222"   # NATS client (only needed to connect from the host)
     networks:
       - inflow_net
+    healthcheck:
+      # HTTP smoke test: the onboarding portal Fractal registers against must be
+      # answering before dependents start. Try curl, fall back to wget so the
+      # check works regardless of which is present in the image.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8022/register/abc >/dev/null 2>&1 || wget -qO- http://localhost:8022/register/abc >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
   fractal:
     image: mehdishokohi/fractal:latest
     container_name: ${FRACTAL_NAME:-fractal-1}
     restart: unless-stopped   # retries registration until Infra is reachable
     depends_on:
-      - infra
+      infra:
+        # Wait for Infra's HTTP smoke test to pass, not just for the container
+        # to start, so the first registration attempt lands on a live portal.
+        condition: service_healthy
     environment:
       TAGS: ${FRACTAL_TAGS:-default}
       # Registers against Infra's built-in default portal ("abc"), reached by
