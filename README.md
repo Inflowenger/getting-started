@@ -388,10 +388,6 @@ compiled artifacts, so buildx just layers the base image + entrypoint per arch;
 the actual compile happens on the user's machine at run time:
 
 ```bash
-# platform binaries (built however you build them, then pushed multi-arch)
-docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/inflow-infra:latest --push .
-docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/fractal:latest       --push .
-
 # self-building panel images — context is irrelevant, so build straight from the Dockerfile
 docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/inflow-inspector-api:latest --push - < path/to/inflow-inspector-api/Dockerfile
 docker buildx build --platform linux/amd64,linux/arm64 -t mehdishokohi/inflow-inspector:latest     --push - < path/to/inflow-inspector/Dockerfile
