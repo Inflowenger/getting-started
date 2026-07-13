@@ -174,13 +174,22 @@ services:
       - "4222:4222"   # NATS client (only needed to connect from the host)
     networks:
       - inflow_net
+    healthcheck:
+      # HTTP smoke test: the onboarding portal Fractal registers against must be
+      # answering before dependents start. curl, falling back to wget.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8022/register/abc >/dev/null 2>&1 || wget -qO- http://localhost:8022/register/abc >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
 
   fractal:
     image: ${FRACTAL_IMAGE}
     container_name: ${FRACTAL_NAME:-fractal-1}
     restart: unless-stopped
     depends_on:
-      - infra
+      infra:
+        condition: service_healthy   # wait for the HTTP smoke test, not just start
     environment:
       TAGS: ${FRACTAL_TAGS:-default}
       REGISTER_URL: ${FRACTAL_REGISTER_URL:-http://inflow-infra:8022/register/abc}
