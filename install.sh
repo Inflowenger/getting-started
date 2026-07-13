@@ -92,10 +92,14 @@ confirm() { # <prompt> <default y|n> -> exit status
 }
 
 gen_secret() {
+  # 64-char alphanumeric key. Generated once here and used verbatim for every
+  # secret that must match: Infra's API_JWT_SECRET and the panel's
+  # INFLOW_INFRA_JWT_SECRET. On a fresh store Infra adopts this exact key, so
+  # the panel that shares it authenticates without any log-scraping.
   if command -v openssl >/dev/null 2>&1; then
-    openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 60
+    openssl rand -base64 64 | tr -dc 'A-Za-z0-9' | head -c 64
   else
-    LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 60
+    LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 64
   fi
 }
 
