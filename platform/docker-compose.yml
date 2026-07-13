@@ -13,7 +13,7 @@ name: inflow-platform
 
 services:
   infra:
-    image: mehdishokohi/inflow-infra:latest
+    image: ${INFRA_IMAGE:-mehdishokohi/inflow-infra:latest}
     container_name: inflow-infra
     restart: unless-stopped
     environment:
@@ -35,16 +35,18 @@ services:
       - inflow_net
     healthcheck:
       # HTTP smoke test: the onboarding portal Fractal registers against must be
-      # answering before dependents start. Try curl, fall back to wget so the
-      # check works regardless of which is present in the image.
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8022/register/abc >/dev/null 2>&1 || wget -qO- http://localhost:8022/register/abc >/dev/null 2>&1"]
+      # answering before dependents start. The image ships no curl/wget/nc, so we
+      # do the HTTP round-trip with bash's /dev/tcp — a 405 for GET still proves
+      # the HTTP server is routing (the endpoint is POST-only), which is all a
+      # readiness smoke test needs.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8022 && printf 'GET /register/abc HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -qi http"]
       interval: 5s
       timeout: 3s
       retries: 20
       start_period: 5s
 
   fractal:
-    image: mehdishokohi/fractal:latest
+    image: ${FRACTAL_IMAGE:-mehdishokohi/fractal:latest}
     container_name: ${FRACTAL_NAME:-fractal-1}
     restart: unless-stopped   # retries registration until Infra is reachable
     depends_on:

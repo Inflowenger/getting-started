@@ -20,7 +20,7 @@ name: inflow-inspector
 
 services:
   inflow-inspector-api:
-    image: mehdishokohi/inflow-inspector-api:latest
+    image: ${INSPECTOR_API_IMAGE:-mehdishokohi/inflow-inspector-api:latest}
     container_name: inflow-inspector-api
     restart: unless-stopped
     environment:
@@ -46,7 +46,7 @@ services:
       - inflow_net
 
   inflow-inspector:
-    image: mehdishokohi/inflow-inspector:latest
+    image: ${INSPECTOR_IMAGE:-mehdishokohi/inflow-inspector:latest}
     container_name: inflow-inspector
     restart: unless-stopped
     depends_on:
