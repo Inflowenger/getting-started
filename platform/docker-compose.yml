@@ -34,16 +34,19 @@ services:
     networks:
       - inflow_net
     healthcheck:
-      # HTTP smoke test: the onboarding portal Fractal registers against must be
-      # answering before dependents start. The image ships no curl/wget/nc, so we
-      # do the HTTP round-trip with bash's /dev/tcp — a 405 for GET still proves
-      # the HTTP server is routing (the endpoint is POST-only), which is all a
-      # readiness smoke test needs.
-      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8022 && printf 'GET /register/abc HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -qi http"]
-      interval: 5s
+      # Infra serves a readiness probe on 8023 (container-internal, never
+      # published) and opens that port only after NATS and the portal are both
+      # up — unlike the API on 8022, which starts listening mid-boot. The image
+      # ships no curl/wget/nc, so the round-trip goes through bash's /dev/tcp.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8023 && printf 'GET /healthz HTTP/1.0\\r\\n\\r\\n' >&3 && head -n1 <&3 | grep -q ' 200 '"]
+      # Probe every 2s while booting so `depends_on` releases Fractal the moment
+      # Infra is ready, then every 30s to keep `docker ps` health honest. The
+      # probe has no request logging, so a steady cadence costs no log noise.
+      start_period: 100s
+      start_interval: 2s
+      interval: 30s
       timeout: 3s
-      retries: 20
-      start_period: 5s
+      retries: 3
 
   fractal:
     image: ${FRACTAL_IMAGE:-mehdishokohi/fractal:latest}
@@ -56,6 +59,14 @@ services:
         condition: service_healthy
     environment:
       TAGS: ${FRACTAL_TAGS:-default}
+      # The name this Fractal registers under. Without it, Fractal falls back to
+      # the container's hostname — which Docker sets to the container ID, so
+      # Infra lists an unreadable "a1b2c3d4e5f6" instead of "fractal-1". Kept in
+      # sync with container_name above so the name Infra shows is the same name
+      # `docker ps` shows, and so it stays resolvable on inflow_net (Docker
+      # aliases container_name on the network, and the URL Fractal advertises
+      # for itself is http://<name>:9001).
+      MY_NAME: ${FRACTAL_NAME:-fractal-1}
       # Registers against Infra's built-in default portal ("abc"), reached by
       # the compose service name over inflow_net.
       REGISTER_URL: ${FRACTAL_REGISTER_URL:-http://inflow-infra:8022/register/abc}

@@ -262,6 +262,7 @@ Re-open the dialog and hit **Log Out** to clear them.
 | Port   | Service          | Purpose                                  |
 |--------|------------------|------------------------------------------|
 | `8022` | Infra            | HTTP API / onboarding portal             |
+| `8023` | Infra            | Readiness probe `/healthz` — not published; opens only once Infra is fully up |
 | `8222` | Infra            | NATS HTTP monitor                        |
 | `4222` | Infra            | NATS client (only if connecting locally) |
 | `8025` | inflow-inspector-api | REST + WebSocket log feed             |
