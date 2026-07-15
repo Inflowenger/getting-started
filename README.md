@@ -19,8 +19,8 @@ panel URL:
 curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/install.sh | bash
 ```
 
-It writes real `docker compose` stacks into `~/inflowenger/` (override with
-`INFLOW_DIR`), so afterward you manage them exactly like the manual steps below.
+It writes real `docker compose` stacks into the directory you run it from
+(override with `INFLOW_DIR`), so afterward you manage them exactly like the manual steps below.
 The prompts read from your terminal even through the pipe; to run it unattended,
 drive it with env vars instead — e.g. accept every default and skip the panel:
 
@@ -34,7 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/in
 
 | Var | Default | Purpose |
 |-----|---------|---------|
-| `INFLOW_DIR` | `~/inflowenger` | Where the compose stacks are written. |
+| `INFLOW_DIR` | *current directory* | Where the compose stacks are written. |
 | `API_JWT_SECRET` | *generated* | Infra API Secret Key / shared JWT secret. |
 | `OPERATOR_SEED` | *Infra generates* | NATS operator seed. |
 | `INFRA_CLUSTER` | *(empty)* | Cluster name for a paid/sponsored license. |

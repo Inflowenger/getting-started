@@ -16,7 +16,7 @@
 # curl) and non-interactively (drive it entirely with the env vars below).
 #
 # Env vars (all optional — prompted for when a TTY is available, else defaulted):
-#   INFLOW_DIR          install directory                 (default: $HOME/inflowenger)
+#   INFLOW_DIR          install directory                 (default: current directory)
 #   API_JWT_SECRET      Infra API Secret Key / shared JWT secret (default: generated)
 #   OPERATOR_SEED       NATS operator seed                (default: Infra generates one)
 #   INFRA_CLUSTER       cluster name for a paid license   (default: empty / free use)
@@ -35,7 +35,7 @@
 set -euo pipefail
 
 # ── config / defaults ─────────────────────────────────────────────────────────
-INFLOW_DIR="${INFLOW_DIR:-$HOME/inflowenger}"
+INFLOW_DIR="${INFLOW_DIR:-$PWD}"
 API_JWT_SECRET="${API_JWT_SECRET:-}"
 OPERATOR_SEED="${OPERATOR_SEED:-}"
 INFRA_CLUSTER="${INFRA_CLUSTER:-}"
@@ -72,12 +72,14 @@ ask() { # <prompt> <default> -> echoes answer
   printf '%s' "${reply:-$def}"
 }
 
-ask_secret() { # <prompt> -> echoes answer (input hidden)
+# Input is echoed rather than hidden: the key is printed in the summary and
+# written to platform/.env anyway, and a silent prompt gives no feedback that a
+# pasted value actually landed.
+ask_secret() { # <prompt> -> echoes answer
   local prompt="$1" reply
   if ! have_tty; then printf ''; return; fi
   printf '%s%s%s: ' "$B" "$prompt" "$RST" >/dev/tty
-  IFS= read -rs reply </dev/tty || reply=""
-  printf '\n' >/dev/tty
+  IFS= read -r reply </dev/tty || reply=""
   printf '%s' "$reply"
 }
 
@@ -141,6 +143,7 @@ INFLOW_DIR="$(ask "Install directory" "$INFLOW_DIR")"
 # API Secret Key — the HMAC secret Infra uses and the panel shares.
 if [ -z "$API_JWT_SECRET" ] && have_tty; then
   info "Infra needs an API Secret Key (shared with the panel). Leave blank to auto-generate."
+  info "${DIM}Paste with Ctrl+Shift+V (or right-click / Cmd+V) — Ctrl+V is not paste in a terminal.${RST}"
   API_JWT_SECRET="$(ask_secret "API Secret Key (blank = generate)")"
 fi
 GENERATED_SECRET=0
