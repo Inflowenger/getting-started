@@ -31,6 +31,7 @@
 #   INSPECTOR_API_REF   branch/tag the api image builds at runtime  (default: master)
 #   INSPECTOR_REF       branch/tag the panel image builds at runtime (default: master)
 #   ASSUME_YES          1 — accept all defaults, no prompts (default: 0)
+#   EULA_ACCEPT         1 — accept the EULA non-interactively   (default: prompted)
 #
 set -euo pipefail
 
@@ -47,6 +48,8 @@ IMAGE_TAG="${IMAGE_TAG:-latest}"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/Inflowenger/getting-started}"
 REPO_REF="${REPO_REF:-main}"
 ASSUME_YES="${ASSUME_YES:-0}"
+EULA_ACCEPT="${EULA_ACCEPT:-0}"
+EULA_URL="${EULA_URL:-https://github.com/Inflowenger/getting-started/blob/main/EULA.md}"
 
 # ── pretty output ─────────────────────────────────────────────────────────────
 if [ -t 1 ]; then
@@ -135,6 +138,24 @@ ok "docker + compose available ($DC); downloader: $DL"
 # ── banner ────────────────────────────────────────────────────────────────────
 printf '\n%s  Inflowenger installer%s\n' "$B" "$RST"
 printf '%s  platform (Infra + Fractal)%s + optional developer panel\n' "$DIM" "$RST"
+
+# ── license (EULA) ────────────────────────────────────────────────────────────
+step "License"
+info "Inflowenger is proprietary software — free for personal, non-commercial use"
+info "(limited edition). Commercial, high-value or high-volume use needs a separate"
+info "commercial or unlimited license. Instances report completed-process counts and"
+info "basic metadata (version, cluster id, IP) for automatic licensing and fair-use"
+info "analytics — no process data content is transmitted."
+info "Full EULA: ${B}${EULA_URL}${RST}"
+if [ "$EULA_ACCEPT" != "1" ] && [ "$ASSUME_YES" != "1" ]; then
+  if have_tty; then
+    [ "$(ask 'Type "I AGREE" to accept the EULA and continue' '')" = "I AGREE" ] \
+      || die "EULA not accepted."
+  else
+    die "EULA not accepted — re-run with EULA_ACCEPT=1 (or ASSUME_YES=1). See $EULA_URL"
+  fi
+fi
+ok "EULA accepted."
 
 # ── collect parameters ────────────────────────────────────────────────────────
 step "Configuration"
