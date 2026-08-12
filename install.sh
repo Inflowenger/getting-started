@@ -149,7 +149,7 @@ info "analytics — no process data content is transmitted."
 info "Full EULA: ${B}${EULA_URL}${RST}"
 if [ "$EULA_ACCEPT" != "1" ] && [ "$ASSUME_YES" != "1" ]; then
   if have_tty; then
-    [ "$(ask 'Type "I AGREE" to accept the EULA and continue' '')" = "I AGREE" ] \
+    [ "$(ask 'Type "I AGREE" to accept the EULA and continue' 'I AGREE')" = "I AGREE" ] \
       || die "EULA not accepted."
   else
     die "EULA not accepted — re-run with EULA_ACCEPT=1 (or ASSUME_YES=1). See $EULA_URL"
