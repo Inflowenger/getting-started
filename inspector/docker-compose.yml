@@ -44,6 +44,11 @@ services:
       - "8025:8025"
     networks:
       - inflow_net
+    # `host.docker.internal` is not created automatically on Linux; this maps it
+    # to the bridge gateway so anything running on the Docker host can be named
+    # instead of addressed by a gateway IP that changes with the network.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   inflow-inspector:
     image: ${INSPECTOR_IMAGE:-mehdishokohi/inflow-inspector:latest}
@@ -61,6 +66,11 @@ services:
     # runtime, Swagger-style. Nothing to configure here.
     ports:
       - "8080:80"
+    # `host.docker.internal` is not created automatically on Linux; this maps it
+    # to the bridge gateway so anything running on the Docker host can be named
+    # instead of addressed by a gateway IP that changes with the network.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   inflow_net:

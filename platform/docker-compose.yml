@@ -33,6 +33,11 @@ services:
       - "4222:4222"   # NATS client (only needed to connect from the host)
     networks:
       - inflow_net
+    # `host.docker.internal` is not created automatically on Linux; this maps it
+    # to the bridge gateway so anything running on the Docker host can be named
+    # instead of addressed by a gateway IP that changes with the network.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       # Infra serves a readiness probe on 8023 (container-internal, never
       # published) and opens that port only after NATS and the portal are both
@@ -72,6 +77,11 @@ services:
       REGISTER_URL: ${FRACTAL_REGISTER_URL:-http://inflow-infra:8022/register/abc}
     networks:
       - inflow_net
+    # `host.docker.internal` is not created automatically on Linux; this maps it
+    # to the bridge gateway so anything running on the Docker host can be named
+    # instead of addressed by a gateway IP that changes with the network.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 networks:
   # Shared, externally-managed network (fixed name, no compose project prefix) so
