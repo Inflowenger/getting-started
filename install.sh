@@ -24,7 +24,17 @@
 #   FRACTAL_NAME        Fractal container name             (default: fractal-1)
 #   INSTALL_INSPECTOR   1/0 — install the inspector panel  (default: prompted, else 0)
 #   IMAGE_NS            Docker Hub namespace for all images (default: mehdishokohi)
-#   IMAGE_TAG           tag for all pulled images           (default: latest)
+#   IMAGE_TAG           fallback tag for every image        (default: latest)
+#   INFRA_TAG           tag for inflow-infra                (default: $IMAGE_TAG)
+#   FRACTAL_TAG         tag for fractal, e.g. v1.1.5        (default: $IMAGE_TAG)
+#   INSPECTOR_API_TAG   tag for inflow-inspector-api        (default: $IMAGE_TAG)
+#   INSPECTOR_TAG       tag for inflow-inspector            (default: $IMAGE_TAG)
+#                       The four repos are versioned independently (fractal is at
+#                       v1.1.x while infra is at v1.0.x), so one IMAGE_TAG can
+#                       never name a real release of all of them — pin per image.
+#   PULL_POLICY         always|missing — always re-pulls and fails the install if
+#                       a pull fails, rather than silently starting a stale
+#                       cached image                        (default: always)
 #   REPO_RAW            raw base URL the compose files are fetched from
 #                       (default: https://raw.githubusercontent.com/Inflowenger/getting-started)
 #   REPO_REF            branch/tag to fetch compose files from  (default: main)
@@ -45,6 +55,14 @@ FRACTAL_NAME="${FRACTAL_NAME:-fractal-1}"
 INSTALL_INSPECTOR="${INSTALL_INSPECTOR:-}"
 IMAGE_NS="${IMAGE_NS:-mehdishokohi}"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+# Per-image tags. `latest` is a floating tag that only moves when someone
+# re-pushes it, so it can lag the newest release by weeks — pin the exact
+# version here (e.g. FRACTAL_TAG=v1.1.5) when that matters.
+INFRA_TAG="${INFRA_TAG:-$IMAGE_TAG}"
+FRACTAL_TAG="${FRACTAL_TAG:-$IMAGE_TAG}"
+INSPECTOR_API_TAG="${INSPECTOR_API_TAG:-$IMAGE_TAG}"
+INSPECTOR_TAG="${INSPECTOR_TAG:-$IMAGE_TAG}"
+PULL_POLICY="${PULL_POLICY:-always}"
 REPO_RAW="${REPO_RAW:-https://raw.githubusercontent.com/Inflowenger/getting-started}"
 REPO_REF="${REPO_REF:-main}"
 ASSUME_YES="${ASSUME_YES:-0}"
@@ -119,6 +137,28 @@ fetch() { # <url> <dest>
   esac || die "failed to download $1"
 }
 
+# Pull failures used to be swallowed (`pull --quiet 2>/dev/null || true`), so a
+# registry or network error fell straight through to `up -d` and started
+# whatever copy of the tag was already in the local cache — which is how an
+# install can come up on a weeks-old `latest` without a word of warning. Pull
+# loudly, and stop rather than run something stale.
+compose_pull() { # <dir>
+  local dir="$1" out
+  if [ "$PULL_POLICY" = "missing" ]; then
+    warn "PULL_POLICY=missing — starting from cached images without checking the registry."
+    return 0
+  fi
+  if out="$( cd "$dir" && $DC pull 2>&1 )"; then
+    ok "images pulled"
+    return 0
+  fi
+  printf '%s\n' "$out" | sed 's/^/    /' >&2
+  die "could not pull the images (registry output above).
+    A cached copy of these tags may be an older release, so the install stops
+    instead of silently starting a stale version. Retry when the registry is
+    reachable, or set PULL_POLICY=missing to knowingly run what is cached."
+}
+
 # ── prerequisites ─────────────────────────────────────────────────────────────
 step "Checking prerequisites"
 command -v docker >/dev/null 2>&1 || die "docker is not installed or not on PATH."
@@ -182,17 +222,22 @@ if have_tty && confirm "Set advanced options (operator seed, cluster name)?" n; 
 fi
 
 # Decide about the inspector panel up front so the whole run is unattended after this.
+# Defaults to NO: the panel is an optional developer tool, its first start
+# clones + compiles from source (minutes, needs GitHub/Go/npm reachable), and a
+# plain platform install should not pay for it unless it was asked for. The
+# no-TTY / ASSUME_YES path lands on the same default, so it matches the 0
+# documented at the top of this file.
 if [ -z "$INSTALL_INSPECTOR" ]; then
-  if confirm "Also install the inspector developer panel?" y; then INSTALL_INSPECTOR=1; else INSTALL_INSPECTOR=0; fi
+  if confirm "Also install the inspector developer panel?" n; then INSTALL_INSPECTOR=1; else INSTALL_INSPECTOR=0; fi
 fi
 # All four images are pulled from Docker Hub as multi-arch manifests. The two
 # inspector images are self-building: their entrypoint clones + compiles the
 # source at container START (native to this CPU), so nothing builds at image
 # time. INSPECTOR_*_REF picks the branch/tag each one checks out at runtime.
-INFRA_IMAGE="$IMAGE_NS/inflow-infra:$IMAGE_TAG"
-FRACTAL_IMAGE="$IMAGE_NS/fractal:$IMAGE_TAG"
-INSPECTOR_API_IMAGE="$IMAGE_NS/inflow-inspector-api:$IMAGE_TAG"
-INSPECTOR_IMAGE="$IMAGE_NS/inflow-inspector:$IMAGE_TAG"
+INFRA_IMAGE="$IMAGE_NS/inflow-infra:$INFRA_TAG"
+FRACTAL_IMAGE="$IMAGE_NS/fractal:$FRACTAL_TAG"
+INSPECTOR_API_IMAGE="$IMAGE_NS/inflow-inspector-api:$INSPECTOR_API_TAG"
+INSPECTOR_IMAGE="$IMAGE_NS/inflow-inspector:$INSPECTOR_TAG"
 INSPECTOR_API_REF="${INSPECTOR_API_REF:-master}"
 INSPECTOR_REF="${INSPECTOR_REF:-master}"
 
@@ -230,7 +275,9 @@ else
 fi
 
 step "Starting the platform (Infra + Fractal)"
-( cd "$INFLOW_DIR/platform" && $DC pull --quiet 2>/dev/null || true; $DC up -d )
+info "Images: $INFRA_IMAGE + $FRACTAL_IMAGE"
+compose_pull "$INFLOW_DIR/platform"
+( cd "$INFLOW_DIR/platform" && $DC up -d )
 
 # Wait for Infra to finish booting (it logs "Infra Started" on a healthy start).
 info "Waiting for Infra to become ready..."
@@ -266,7 +313,8 @@ if [ "$INSTALL_INSPECTOR" = "1" ]; then
 
   step "Starting the inspector panel"
   info "First start clones + compiles inside the container — this can take a few minutes."
-  ( cd "$INFLOW_DIR/inspector" && $DC pull --quiet 2>/dev/null || true; $DC up -d )
+  compose_pull "$INFLOW_DIR/inspector"
+  ( cd "$INFLOW_DIR/inspector" && $DC up -d )
   ok "panel starting (http://localhost:8080) — watch the build with:"
   info "  (cd $INFLOW_DIR/inspector && $DC logs -f)"
 fi
@@ -277,6 +325,9 @@ printf '\n%s  Platform%s\n' "$B" "$RST"
 info "Infra API / portal   http://localhost:8022"
 info "NATS HTTP monitor    http://localhost:8222"
 info "Fractal              $FRACTAL_NAME  (tags: $FRACTAL_TAGS)"
+info "Images               $INFRA_IMAGE"
+info "                     $FRACTAL_IMAGE"
+info "${DIM}Pin a version with e.g. FRACTAL_TAG=v1.1.5 INFRA_TAG=v1.0.9${RST}"
 printf '\n%s  API Secret Key%s  %s(save this — it is your admin credential)%s\n' "$B" "$RST" "$DIM" "$RST"
 printf '    %s%s%s\n' "$YLW" "$API_JWT_SECRET" "$RST"
 [ "$GENERATED_SECRET" = "1" ] && info "(auto-generated; also stored in $INFLOW_DIR/platform/.env)"

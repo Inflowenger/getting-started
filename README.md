@@ -40,12 +40,27 @@ curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/in
 | `INFRA_CLUSTER` | *(empty)* | Cluster name for a paid/sponsored license. |
 | `FRACTAL_TAGS` | `default` | Comma-separated Fractal tags. |
 | `FRACTAL_NAME` | `fractal-1` | Fractal container name. |
-| `INSTALL_INSPECTOR` | *prompted* | `1`/`0` — install the inspector panel. |
+| `INSTALL_INSPECTOR` | *prompted, default no* | `1`/`0` — install the inspector panel. |
 | `IMAGE_NS` | `mehdishokohi` | Docker Hub namespace for all images. |
-| `IMAGE_TAG` | `latest` | Image tag for all images. |
+| `IMAGE_TAG` | `latest` | Fallback tag, used for any image without its own tag below. |
+| `INFRA_TAG` | `$IMAGE_TAG` | Tag for `inflow-infra`, e.g. `v1.0.9`. |
+| `FRACTAL_TAG` | `$IMAGE_TAG` | Tag for `fractal`, e.g. `v1.1.5`. |
+| `INSPECTOR_API_TAG` | `$IMAGE_TAG` | Tag for `inflow-inspector-api`. |
+| `INSPECTOR_TAG` | `$IMAGE_TAG` | Tag for `inflow-inspector`. |
+| `PULL_POLICY` | `always` | `missing` — start from cached images instead of failing when a pull fails. |
 | `INSPECTOR_API_REF` | `master` | Branch/tag the backend image builds at runtime. |
 | `INSPECTOR_REF` | `master` | Branch/tag the frontend image builds at runtime. |
 | `ASSUME_YES` | `0` | `1` — accept all defaults, no prompts. |
+
+The four images are versioned independently — `fractal` is on `v1.1.x` while
+`inflow-infra` is on `v1.0.x` — so one `IMAGE_TAG` cannot name a real release of
+all of them. `latest` only moves when it is re-pushed, so it can lag the newest
+release; pin the exact versions when that matters:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Inflowenger/getting-started/main/install.sh \
+  | FRACTAL_TAG=v1.1.5 INFRA_TAG=v1.0.9 bash
+```
 
 </details>
 
